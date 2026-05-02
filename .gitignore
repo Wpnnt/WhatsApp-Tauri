@@ -15,6 +15,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 yarn.lock
+
 # --- Tauri Specific ---
 **/src-tauri/gen/schemas/
 **/src-tauri/target/
