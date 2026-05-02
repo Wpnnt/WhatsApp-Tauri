@@ -1,0 +1,73 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: './whatsapp-lite/package-lock.json'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './whatsapp-lite/src-tauri -> target'
+
+      - name: Extract changelog notes
+        id: extract_changelog
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}" # Remove o prefixo 'v' se existir
+          # Pega o conteúdo entre a versão atual e a próxima seção no CHANGELOG.md
+          sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '1d;$d' > notes.md
+          # Salva no output do GitHub Actions
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: ./whatsapp-lite
+
+      - name: Build and Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./whatsapp-lite
+          tagName: ${{ github.ref_name }}
+          releaseName: 'WhatsApp Tauri ${{ github.ref_name }}'
+          releaseBody: |
+            ${{ steps.extract_changelog.outputs.NOTES }}
+            
+            ---
+            *Built by Wpnnt using Tauri v2.*
+          releaseDraft: false
+          prerelease: false
