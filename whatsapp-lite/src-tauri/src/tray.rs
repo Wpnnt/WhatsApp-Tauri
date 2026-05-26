@@ -11,33 +11,26 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .text("quit", "Quit")
         .build()?;
 
-    let app_handle_menu = app.clone();
-    let app_handle_tray = app.clone();
     let mut builder = TrayIconBuilder::new()
         .menu(&menu)
         .tooltip("WhatsApp Tauri");
+
     if let Some(icon) = app.default_window_icon().cloned() {
         builder = builder.icon(icon);
     }
 
     builder
-        .on_menu_event(move |_, event: tauri::menu::MenuEvent| match event.id().as_ref() {
-            "open" => window::restore(&app_handle_menu),
-            "quit" => std::process::exit(0),
+        .on_menu_event(move |app, event| match event.id().as_ref() {
+            "open" => window::show(app),
+            "quit" => app.exit(0),
             _ => {}
         })
-        .on_tray_icon_event(move |_, event| match event {
-            TrayIconEvent::Click { button, .. } => {
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button, .. } | TrayIconEvent::DoubleClick { button, .. } = event {
                 if button == tauri::tray::MouseButton::Left {
-                    window::restore(&app_handle_tray)
+                    window::show(tray.app_handle());
                 }
             }
-            TrayIconEvent::DoubleClick { button, .. } => {
-                if button == tauri::tray::MouseButton::Left {
-                    window::restore(&app_handle_tray)
-                }
-            }
-            _ => {}
         })
         .build(app)?;
 

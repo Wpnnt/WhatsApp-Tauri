@@ -3,12 +3,22 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
+  "remote": {
+    "urls": ["https://web.whatsapp.com/**"]
+  },
   "permissions": [
     "core:default",
     "opener:default",
     "notification:default",
     "autostart:default",
     "global-shortcut:default",
-    "core:tray:default"
+    "core:tray:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "http://**" },
+        { "url": "https://**" }
+      ]
+    }
   ]
 }

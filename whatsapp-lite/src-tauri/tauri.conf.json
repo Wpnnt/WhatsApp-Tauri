@@ -1,16 +1,17 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Whatsapp Tauri",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "identifier": "com.wpnnt.whatsapptauri",
   "build": {
     "devUrl": "https://web.whatsapp.com",
-    "frontendDist": "../frontend"
+    "frontendDist": "icons"
   },
   "app": {
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "Whatsapp Tauri",
         "width": 1200,
         "height": 800,
@@ -22,6 +23,15 @@
     ],
     "security": {
       "csp": null
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "whatsapp"
+        ]
+      }
     }
   },
   "bundle": {
