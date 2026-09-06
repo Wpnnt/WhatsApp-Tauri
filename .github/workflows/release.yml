@@ -68,4 +68,5 @@ jobs:
             ---
             *Built by Wpnnt using Tauri v2.*
           releaseDraft: false
-          prerelease: true
+          # Stable by default: mark as prerelease only for preview tags with a suffix (e.g. v0.3.2-dev)
+          prerelease: ${{ contains(github.ref_name, '-') }}
