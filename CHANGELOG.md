@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-09-06
+### Added
+- **Download Manager**: Choose a custom download folder via `Settings → Select Custom Download Folder...` or let every file be saved through a native dialog with `Always Ask Where to Save Files`. Settings persist across restarts.
+- **Safe Filename Handling**: Sanitizes invalid characters and auto-renames duplicates (`name (1).ext`) so downloads never silently overwrite existing files.
+- **Download Notifications**: Native system notification ("Download Concluído") with file name and destination path when a download finishes.
+- **Settings Submenu**: Full native menu with toggles for Start with System (autostart), Handle WhatsApp Links (deep-link on/off, persisted, re-registers/unregisters the `whatsapp://` scheme on the fly) and download options, plus the About dialog under Help.
+- **Close-to-Tray**: Closing the window hides the app to the system tray instead of quitting (Quit via tray menu or Ctrl+Alt+W to toggle the window).
+
+### Changed
+- **Native Menu Reconstruction**: The menu is fully rebuilt after every menu interaction so checkbox states always stay in sync with real app state (avoids Windows checkmark bugs).
+
 ## [0.2.0] - 2026-05-25
 ### Added
 - **Deep Link Support (`whatsapp://`)**: Fully implemented support for opening `whatsapp://send` and `whatsapp://chat` links directly from the OS, enabling seamless joining of groups and starting direct chats from the browser.

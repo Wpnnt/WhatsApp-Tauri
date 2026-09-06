@@ -68,4 +68,4 @@ jobs:
             ---
             *Built by Wpnnt using Tauri v2.*
           releaseDraft: false
-          prerelease: false
+          prerelease: true

@@ -1,6 +1,6 @@
 [package]
 name = "whatsapp-tauri"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Tauri App"
 authors = ["Wpnnt"]
 edition = "2021"
