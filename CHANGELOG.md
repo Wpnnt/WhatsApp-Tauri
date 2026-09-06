@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-09-06
+### Fixed
+- **Cancel Download**: With "Always Ask Where to Save Files" enabled, dismissing/canceling the save dialog now cancels the download entirely instead of silently saving to the default folder.
+- **English Notifications**: Download completion notifications now use English copy ("Download Completed" / "... saved to ...").
+
+### Changed
+- **CI**: Upgraded `actions/checkout` and `actions/setup-node` to v5, removing Node.js 20 deprecation warnings from release builds.
+
 ## [0.3.0] - 2026-09-06
 ### Added
 - **Download Manager**: Choose a custom download folder via `Settings → Select Custom Download Folder...` or let every file be saved through a native dialog with `Always Ask Where to Save Files`. Settings persist across restarts.
 - **Safe Filename Handling**: Sanitizes invalid characters and auto-renames duplicates (`name (1).ext`) so downloads never silently overwrite existing files.
-- **Download Notifications**: Native system notification ("Download Concluído") with file name and destination path when a download finishes.
+- **Download Notifications**: Native system notification ("Download Completed") with file name and destination path when a download finishes.
 - **Settings Submenu**: Full native menu with toggles for Start with System (autostart), Handle WhatsApp Links (deep-link on/off, persisted, re-registers/unregisters the `whatsapp://` scheme on the fly) and download options, plus the About dialog under Help.
 - **Close-to-Tray**: Closing the window hides the app to the system tray instead of quitting (Quit via tray menu or Ctrl+Alt+W to toggle the window).
 

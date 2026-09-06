@@ -329,12 +329,21 @@ fn main() {
                                     .save_file(move |file_path| {
                                         let _ = tx.send(file_path);
                                     });
-                                if let Ok(Some(path)) = rx.recv() {
-                                    if let Some(p) = path.as_path() {
-                                        *destination = p.to_path_buf();
+                                // User picked a path → save there and let the download start.
+                                // User canceled the dialog (`None`) or the dialog failed (`Err`)
+                                // → return `false` so Tauri prevents the download entirely.
+                                return match rx.recv() {
+                                    Ok(Some(file_path)) => {
+                                        if let Some(p) = file_path.as_path() {
+                                            *destination = p.to_path_buf();
+                                        }
+                                        true
                                     }
-                                }
-                            } else if let Some(ref custom_path) = settings.download_path {
+                                    _ => false,
+                                };
+                            }
+
+                            if let Some(ref custom_path) = settings.download_path {
                                 let custom_dir = std::path::PathBuf::from(custom_path);
                                 if custom_dir.exists() {
                                     *destination = resolve_unique_path(&custom_dir, &raw_filename);
@@ -357,8 +366,8 @@ fn main() {
                                     let _ = h_notif
                                         .notification()
                                         .builder()
-                                        .title("Download Concluído")
-                                        .body(format!("{}: salvo em {}", file_name, path_str))
+                                        .title("Download Completed")
+                                        .body(format!("{}: saved to {}", file_name, path_str))
                                         .show();
                                 }
                             }
