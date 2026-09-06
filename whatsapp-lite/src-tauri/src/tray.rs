@@ -1,6 +1,6 @@
-use tauri::{AppHandle, Runtime};
 use tauri::menu::MenuBuilder;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Runtime};
 
 use crate::window;
 
@@ -11,9 +11,7 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .text("quit", "Quit")
         .build()?;
 
-    let mut builder = TrayIconBuilder::new()
-        .menu(&menu)
-        .tooltip("WhatsApp Tauri");
+    let mut builder = TrayIconBuilder::new().menu(&menu).tooltip("WhatsApp Tauri");
 
     if let Some(icon) = app.default_window_icon().cloned() {
         builder = builder.icon(icon);
@@ -26,7 +24,9 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button, .. } | TrayIconEvent::DoubleClick { button, .. } = event {
+            if let TrayIconEvent::Click { button, .. } | TrayIconEvent::DoubleClick { button, .. } =
+                event
+            {
                 if button == tauri::tray::MouseButton::Left {
                     window::show(tray.app_handle());
                 }
