@@ -20,7 +20,7 @@ jobs:
       - name: Install Rust stable with Clippy
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
