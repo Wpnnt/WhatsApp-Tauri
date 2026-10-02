@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+## [0.3.2] - 2026-10-02
+
+### Fixed
+- **Navigation Security**: Internal WebView navigation now requires HTTPS and an exact approved WhatsApp hostname; deep links are structurally parsed and validated before navigation.
+- **Download Destination Validation**: Invalid custom download folders now cancel the download instead of silently falling back to another destination.
+- **Concurrent Downloads**: Active download paths are reserved so simultaneous files with the same suggested name receive distinct destinations.
+
+### Changed
+- **Download Save Prompt**: Removed the per-download save dialog because Tauri's synchronous download callback cannot safely wait for its asynchronous result. Downloads continue to support a selected custom folder or the system Downloads directory.
+- **Release Quality Gate**: Release artifact publishing now depends on Rust formatting, Clippy, and test checks.
+
 ## [0.3.1] - 2026-09-06
 ### Fixed
 - **Cancel Download**: With "Always Ask Where to Save Files" enabled, dismissing/canceling the save dialog now cancels the download entirely instead of silently saving to the default folder.
