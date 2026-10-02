@@ -20,14 +20,12 @@ use tauri_plugin_opener::OpenerExt;
 
 const MENU_AUTOSTART_TOGGLE_ID: &str = "menu_autostart_toggle";
 const MENU_DEEP_LINK_TOGGLE_ID: &str = "menu_deep_link_toggle";
-const MENU_DOWNLOAD_ASK_TOGGLE_ID: &str = "menu_download_ask_toggle";
 const MENU_DOWNLOAD_FOLDER_PICK_ID: &str = "menu_download_folder_pick";
 const MENU_DOWNLOAD_FOLDER_RESET_ID: &str = "menu_download_folder_reset";
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 struct DownloadSettings {
     download_path: Option<String>,
-    ask_every_time: bool,
 }
 
 fn read_download_settings<R: Runtime>(app_handle: &AppHandle<R>) -> DownloadSettings {
@@ -65,10 +63,21 @@ fn sanitize_filename(filename: &str) -> String {
     clean
 }
 
-fn resolve_unique_path(target_dir: &std::path::Path, file_name: &str) -> std::path::PathBuf {
+type DownloadReservations =
+    std::sync::Arc<std::sync::Mutex<std::collections::HashSet<std::path::PathBuf>>>;
+
+fn reserve_unique_path(
+    target_dir: &std::path::Path,
+    file_name: &str,
+    reservations: &std::sync::Mutex<std::collections::HashSet<std::path::PathBuf>>,
+) -> std::path::PathBuf {
     let clean_name = sanitize_filename(file_name);
+    let mut reserved = reservations
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut path = target_dir.join(&clean_name);
-    if !path.exists() {
+    if !path.exists() && !reserved.contains(&path) {
+        reserved.insert(path.clone());
         return path;
     }
 
@@ -87,11 +96,69 @@ fn resolve_unique_path(target_dir: &std::path::Path, file_name: &str) -> std::pa
     loop {
         let new_name = format!("{} ({}){}", stem, counter, ext);
         path = target_dir.join(&new_name);
-        if !path.exists() {
+        if !path.exists() && !reserved.contains(&path) {
+            reserved.insert(path.clone());
             return path;
         }
         counter += 1;
     }
+}
+
+fn release_download_reservation(
+    reservations: &std::sync::Mutex<std::collections::HashSet<std::path::PathBuf>>,
+    path: Option<&std::path::Path>,
+    success: bool,
+) {
+    let mut reserved = reservations
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+    if let Some(path) = path {
+        reserved.remove(path);
+    } else if success {
+        reserved.retain(|path| !path.exists());
+    }
+}
+
+fn resolve_custom_download_path(
+    target_dir: &std::path::Path,
+    file_name: &str,
+    reservations: &std::sync::Mutex<std::collections::HashSet<std::path::PathBuf>>,
+) -> std::io::Result<std::path::PathBuf> {
+    use std::io::{Error, ErrorKind};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static PROBE_ID: AtomicU64 = AtomicU64::new(0);
+
+    if !fs::metadata(target_dir)?.is_dir() {
+        return Err(Error::new(
+            ErrorKind::NotADirectory,
+            "the configured download path is not a directory",
+        ));
+    }
+
+    let probe_path = loop {
+        let id = PROBE_ID.fetch_add(1, Ordering::Relaxed);
+        let path = target_dir.join(format!(
+            ".whatsapp-tauri-write-check-{}-{id}",
+            std::process::id()
+        ));
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => {
+                drop(file);
+                break path;
+            }
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    };
+    fs::remove_file(probe_path)?;
+
+    Ok(reserve_unique_path(target_dir, file_name, reservations))
 }
 
 fn read_deep_link_enabled<R: Runtime>(app_handle: &AppHandle<R>) -> bool {
@@ -118,38 +185,73 @@ fn write_deep_link_enabled<R: Runtime>(
     Ok(())
 }
 
-fn parse_whatsapp_link(link: &str) -> Option<String> {
-    if link.starts_with("whatsapp://send") {
-        if let Some(p) = link.split("phone=").nth(1) {
-            let phone = p
-                .split('&')
-                .next()
-                .unwrap_or(p)
-                .trim_matches('"')
-                .trim_matches('\'');
-            return Some(format!("https://web.whatsapp.com/send?phone={}", phone));
-        }
-    } else if link.starts_with("whatsapp://chat") {
-        if let Some(c) = link.split("code=").nth(1) {
-            let code = c
-                .split('&')
-                .next()
-                .unwrap_or(c)
-                .trim_matches('/')
-                .trim_matches('"')
-                .trim_matches('\'');
-            return Some(format!("https://web.whatsapp.com/accept?code={}", code));
+fn parse_whatsapp_link(link: &str) -> Option<tauri::Url> {
+    let link = tauri::Url::parse(link).ok()?;
+    if link.scheme() != "whatsapp"
+        || !link.username().is_empty()
+        || link.password().is_some()
+        || link.port().is_some()
+        || !link.path().is_empty()
+        || link.fragment().is_some()
+    {
+        return None;
+    }
+
+    let route = link.host_str()?;
+    let mut phone = None;
+    let mut code = None;
+    for (key, value) in link.query_pairs() {
+        match (route, key.as_ref()) {
+            ("send", "phone") if phone.is_none() => phone = Some(value.into_owned()),
+            ("chat", "code") if code.is_none() => code = Some(value.into_owned()),
+            ("send", "phone") | ("chat", "code") => return None,
+            _ => {}
         }
     }
-    None
+
+    let mut target = tauri::Url::parse("https://web.whatsapp.com/").ok()?;
+    match route {
+        "send" => {
+            let phone = phone?;
+            if phone.is_empty()
+                || phone.len() > 20
+                || !phone.bytes().all(|byte| byte.is_ascii_digit())
+            {
+                return None;
+            }
+            target.set_path("/send");
+            target.query_pairs_mut().append_pair("phone", &phone);
+        }
+        "chat" => {
+            let code = code?;
+            if code.is_empty()
+                || code.len() > 256
+                || !code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+            {
+                return None;
+            }
+            target.set_path("/accept");
+            target.query_pairs_mut().append_pair("code", &code);
+        }
+        _ => return None,
+    }
+    Some(target)
 }
 
-// STRICT Internal check (Tauri v2 standard)
 fn is_internal_url(url_str: &str) -> bool {
-    url_str.contains("web.whatsapp.com")
-        || url_str.contains("wa.me")
-        || url_str.contains("api.whatsapp.com")
-        || url_str.contains("chat.whatsapp.com")
+    let Ok(url) = tauri::Url::parse(url_str) else {
+        return false;
+    };
+    url.scheme() == "https"
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url.port().is_none()
+        && matches!(
+            url.host_str(),
+            Some("web.whatsapp.com" | "wa.me" | "api.whatsapp.com" | "chat.whatsapp.com")
+        )
 }
 
 fn handle_link<R: Runtime>(app: &AppHandle<R>, url: &str) {
@@ -158,10 +260,7 @@ fn handle_link<R: Runtime>(app: &AppHandle<R>, url: &str) {
     }
     if let Some(web_url) = parse_whatsapp_link(url) {
         if let Some(win) = app.get_webview_window("main") {
-            let _ = win.eval(format!(
-                r#"window.location.assign("{}");"#,
-                web_url.replace('"', "\\\"")
-            ));
+            let _ = win.navigate(web_url);
             let _ = win.show();
             let _ = win.set_focus();
         }
@@ -190,14 +289,6 @@ fn build_native_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<tauri::men
                 .build(app)?,
         )
         .separator()
-        .item(
-            &CheckMenuItemBuilder::with_id(
-                MENU_DOWNLOAD_ASK_TOGGLE_ID,
-                "Always Ask Where to Save Files",
-            )
-            .checked(dl_settings.ask_every_time)
-            .build(app)?,
-        )
         .item(
             &tauri::menu::MenuItemBuilder::with_id(
                 MENU_DOWNLOAD_FOLDER_PICK_ID,
@@ -276,6 +367,9 @@ fn main() {
             let h_new = handle.clone();
             let h_download = handle.clone();
             let h_notif = handle.clone();
+            let download_reservations: DownloadReservations =
+                std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashSet::new()));
+            let download_reservations_for_handler = download_reservations.clone();
 
             let w = WebviewWindowBuilder::from_config(app.handle(), &app.config().app.windows[0])?
                 .disable_drag_drop_handler()
@@ -319,43 +413,44 @@ fn main() {
                                 .unwrap_or("download")
                                 .to_string();
 
-                            if settings.ask_every_time {
-                                let (tx, rx) = std::sync::mpsc::channel();
-                                let clean_name = sanitize_filename(&raw_filename);
-                                h_download
-                                    .dialog()
-                                    .file()
-                                    .set_file_name(&clean_name)
-                                    .save_file(move |file_path| {
-                                        let _ = tx.send(file_path);
-                                    });
-                                // User picked a path → save there and let the download start.
-                                // User canceled the dialog (`None`) or the dialog failed (`Err`)
-                                // → return `false` so Tauri prevents the download entirely.
-                                return match rx.recv() {
-                                    Ok(Some(file_path)) => {
-                                        if let Some(p) = file_path.as_path() {
-                                            *destination = p.to_path_buf();
-                                        }
-                                        true
-                                    }
-                                    _ => false,
-                                };
-                            }
-
                             if let Some(ref custom_path) = settings.download_path {
                                 let custom_dir = std::path::PathBuf::from(custom_path);
-                                if custom_dir.exists() {
-                                    *destination = resolve_unique_path(&custom_dir, &raw_filename);
-                                } else if let Ok(sys_downloads) = h_download.path().download_dir() {
-                                    *destination = resolve_unique_path(&sys_downloads, &raw_filename);
+                                match resolve_custom_download_path(
+                                    &custom_dir,
+                                    &raw_filename,
+                                    &download_reservations_for_handler,
+                                ) {
+                                    Ok(path) => *destination = path,
+                                    Err(error) => {
+                                        let message = format!(
+                                            "Download canceled. The custom folder '{}' is unavailable: {error}",
+                                            custom_dir.display()
+                                        );
+                                        eprintln!("{message}");
+                                        let _ = h_download
+                                            .notification()
+                                            .builder()
+                                            .title("Download Failed")
+                                            .body(message)
+                                            .show();
+                                        return false;
+                                    }
                                 }
                             } else if let Ok(sys_downloads) = h_download.path().download_dir() {
-                                *destination = resolve_unique_path(&sys_downloads, &raw_filename);
+                                *destination = reserve_unique_path(
+                                    &sys_downloads,
+                                    &raw_filename,
+                                    &download_reservations_for_handler,
+                                );
                             }
                             true
                         }
                         tauri::webview::DownloadEvent::Finished { url: _, path, success } => {
+                            release_download_reservation(
+                                &download_reservations_for_handler,
+                                path.as_deref(),
+                                success,
+                            );
                             if success {
                                 if let Some(downloaded_path) = path {
                                     let file_name = downloaded_path
@@ -437,10 +532,6 @@ fn main() {
                         let _ = app.deep_link().unregister("whatsapp");
                     }
                 }
-            } else if id == MENU_DOWNLOAD_ASK_TOGGLE_ID {
-                let mut settings = read_download_settings(app);
-                settings.ask_every_time = !settings.ask_every_time;
-                let _ = write_download_settings(app, &settings);
             } else if id == MENU_DOWNLOAD_FOLDER_PICK_ID {
                 let app_handle = app.clone();
                 app.dialog().file().pick_folder(move |folder_path| {
@@ -477,4 +568,150 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod url_validation_tests {
+    use super::{
+        is_internal_url, parse_whatsapp_link, release_download_reservation, reserve_unique_path,
+        resolve_custom_download_path,
+    };
+    use std::collections::HashSet;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Mutex;
+
+    fn temporary_test_dir() -> std::path::PathBuf {
+        static TEST_ID: AtomicU64 = AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "whatsapp-tauri-test-{}-{}",
+            std::process::id(),
+            TEST_ID.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn allows_only_approved_https_hosts() {
+        for host in [
+            "web.whatsapp.com",
+            "wa.me",
+            "api.whatsapp.com",
+            "chat.whatsapp.com",
+        ] {
+            assert!(is_internal_url(&format!("https://{host}/")), "{host}");
+        }
+    }
+
+    #[test]
+    fn rejects_lookalike_hosts_and_unapproved_url_components() {
+        for url in [
+            "http://web.whatsapp.com/",
+            "https://web.whatsapp.com.evil.example/",
+            "https://evil.example/?next=web.whatsapp.com",
+            "https://wa.me.evil.example/",
+            "https://user@web.whatsapp.com/",
+            "https://web.whatsapp.com:8443/",
+        ] {
+            assert!(!is_internal_url(url), "{url}");
+        }
+    }
+
+    #[test]
+    fn parses_supported_send_and_chat_deep_links_safely() {
+        let send = parse_whatsapp_link("whatsapp://send?phone=15551234567").unwrap();
+        assert_eq!(
+            send.as_str(),
+            "https://web.whatsapp.com/send?phone=15551234567"
+        );
+
+        let chat = parse_whatsapp_link("whatsapp://chat?code=AbC_123-xy").unwrap();
+        assert_eq!(
+            chat.as_str(),
+            "https://web.whatsapp.com/accept?code=AbC_123-xy"
+        );
+
+        let encoded = parse_whatsapp_link("whatsapp://chat?code=AbC%5F123").unwrap();
+        assert_eq!(
+            encoded.as_str(),
+            "https://web.whatsapp.com/accept?code=AbC_123"
+        );
+    }
+
+    #[test]
+    fn rejects_unsupported_or_malformed_deep_links() {
+        for link in [
+            "whatsapp://chatty?phone=15551234567",
+            "whatsapp://send?phone=1555%22%3Balert(1)%2F%2F",
+            "whatsapp://send?phone=abc",
+            "whatsapp://send?phone=15551234567&phone=15557654321",
+            "whatsapp://chat?code=abc%22%3Balert(1)",
+            "whatsapp://chat?code=",
+            "https://web.whatsapp.com/send?phone=15551234567",
+        ] {
+            assert!(parse_whatsapp_link(link).is_none(), "{link}");
+        }
+    }
+
+    #[test]
+    fn custom_download_path_requires_an_existing_directory() {
+        let root = temporary_test_dir();
+        let missing = root.join("missing");
+        let reservations = Mutex::new(HashSet::new());
+        assert!(resolve_custom_download_path(&missing, "file.txt", &reservations).is_err());
+
+        let file = root.join("not-a-directory");
+        std::fs::write(&file, "").unwrap();
+        assert!(resolve_custom_download_path(&file, "file.txt", &reservations).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn custom_download_path_checks_writability_and_avoids_overwriting() {
+        let dir = temporary_test_dir();
+        std::fs::write(dir.join("file.txt"), "existing").unwrap();
+
+        let reservations = Mutex::new(HashSet::new());
+        let destination = resolve_custom_download_path(&dir, "file.txt", &reservations).unwrap();
+        assert_eq!(destination, dir.join("file (1).txt"));
+        assert!(!dir.read_dir().unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".whatsapp-tauri-write-check-")));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn simultaneous_same_name_reservations_choose_distinct_nonexistent_paths() {
+        let dir = temporary_test_dir();
+        let reservations = Mutex::new(HashSet::new());
+
+        let first = reserve_unique_path(&dir, "file.txt", &reservations);
+        let second = reserve_unique_path(&dir, "file.txt", &reservations);
+
+        assert_ne!(first, second);
+        assert_eq!(first, dir.join("file.txt"));
+        assert_eq!(second, dir.join("file (1).txt"));
+        assert!(!first.exists());
+        assert!(!second.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn pathless_success_releases_completed_reservations_only() {
+        let dir = temporary_test_dir();
+        let completed = dir.join("completed.txt");
+        let active = dir.join("active.txt");
+        std::fs::write(&completed, "done").unwrap();
+        let reservations = Mutex::new(HashSet::from([completed.clone(), active.clone()]));
+
+        release_download_reservation(&reservations, None, true);
+
+        let reserved = reservations.lock().unwrap();
+        assert!(!reserved.contains(&completed));
+        assert!(reserved.contains(&active));
+        drop(reserved);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

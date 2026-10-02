@@ -1,12 +1,50 @@
 name: Release
 on:
+  pull_request:
+    branches:
+      - dev
   push:
     tags:
       - 'v*'
   workflow_dispatch:
 
 jobs:
+  quality-gate:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install Rust stable with Clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './whatsapp-lite/src-tauri -> target'
+
+      - name: Check formatting
+        working-directory: ./whatsapp-lite/src-tauri
+        run: cargo fmt --check
+
+      - name: Run Clippy
+        working-directory: ./whatsapp-lite/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run tests
+        working-directory: ./whatsapp-lite/src-tauri
+        run: cargo test --all-targets
+
   release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: quality-gate
     permissions:
       contents: write
     strategy:
@@ -40,18 +78,21 @@ jobs:
       - name: Extract changelog notes
         id: extract_changelog
         shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}" # Remove o prefixo 'v' se existir
-          # Pega o conteúdo entre a versão atual e a próxima seção no CHANGELOG.md
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          VERSION="${RELEASE_TAG#v}"
           sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '1d;$d' > notes.md
-          # Salva no output do GitHub Actions
           echo "NOTES<<EOF" >> $GITHUB_OUTPUT
           cat notes.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
         working-directory: ./whatsapp-lite
 
       - name: Build and Release
