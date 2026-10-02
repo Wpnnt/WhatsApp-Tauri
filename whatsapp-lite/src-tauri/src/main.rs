@@ -104,6 +104,22 @@ fn reserve_unique_path(
     }
 }
 
+fn release_download_reservation(
+    reservations: &std::sync::Mutex<std::collections::HashSet<std::path::PathBuf>>,
+    path: Option<&std::path::Path>,
+    success: bool,
+) {
+    let mut reserved = reservations
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+    if let Some(path) = path {
+        reserved.remove(path);
+    } else if success {
+        reserved.retain(|path| !path.exists());
+    }
+}
+
 fn resolve_custom_download_path(
     target_dir: &std::path::Path,
     file_name: &str,
@@ -430,12 +446,11 @@ fn main() {
                             true
                         }
                         tauri::webview::DownloadEvent::Finished { url: _, path, success } => {
-                            if let Some(path) = path.as_ref() {
-                                download_reservations_for_handler
-                                    .lock()
-                                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                                    .remove(path);
-                            }
+                            release_download_reservation(
+                                &download_reservations_for_handler,
+                                path.as_deref(),
+                                success,
+                            );
                             if success {
                                 if let Some(downloaded_path) = path {
                                     let file_name = downloaded_path
@@ -558,7 +573,8 @@ fn main() {
 #[cfg(test)]
 mod url_validation_tests {
     use super::{
-        is_internal_url, parse_whatsapp_link, reserve_unique_path, resolve_custom_download_path,
+        is_internal_url, parse_whatsapp_link, release_download_reservation, reserve_unique_path,
+        resolve_custom_download_path,
     };
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -679,6 +695,23 @@ mod url_validation_tests {
         assert_eq!(second, dir.join("file (1).txt"));
         assert!(!first.exists());
         assert!(!second.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn pathless_success_releases_completed_reservations_only() {
+        let dir = temporary_test_dir();
+        let completed = dir.join("completed.txt");
+        let active = dir.join("active.txt");
+        std::fs::write(&completed, "done").unwrap();
+        let reservations = Mutex::new(HashSet::from([completed.clone(), active.clone()]));
+
+        release_download_reservation(&reservations, None, true);
+
+        let reserved = reservations.lock().unwrap();
+        assert!(!reserved.contains(&completed));
+        assert!(reserved.contains(&active));
+        drop(reserved);
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
