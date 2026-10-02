@@ -108,6 +108,19 @@ jobs:
             
             ---
             *Built by Wpnnt using Tauri v2.*
-          releaseDraft: false
+          releaseDraft: true
           # Stable by default: mark as prerelease only for preview tags with a suffix (e.g. v0.3.2-dev)
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release after all platform builds succeed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --draft=false

@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+
+## [0.3.2] - 2026-10-02
+
 ### Fixed
 - **Navigation Security**: Internal WebView navigation now requires HTTPS and an exact approved WhatsApp hostname; deep links are structurally parsed and validated before navigation.
 - **Download Destination Validation**: Invalid custom download folders now cancel the download instead of silently falling back to another destination.
