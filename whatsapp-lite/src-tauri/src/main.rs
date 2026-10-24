@@ -52,13 +52,31 @@ fn write_download_settings<R: Runtime>(
 }
 
 fn sanitize_filename(filename: &str) -> String {
-    let invalid_chars = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+    const INVALID_CHARS: [char; 9] = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+    // Windows resolves these to devices even with an extension ("CON.txt").
+    const RESERVED_NAMES: [&str; 22] = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+
     let mut clean = filename
         .chars()
-        .filter(|c| !invalid_chars.contains(c))
+        .filter(|c| !INVALID_CHARS.contains(c) && !c.is_control())
         .collect::<String>();
+
+    // Windows ignores trailing dots and spaces when resolving names; strip
+    // them so the file never lands under a different name than reserved.
+    while clean.ends_with('.') || clean.ends_with(' ') {
+        clean.pop();
+    }
+
     if clean.trim().is_empty() {
         clean = "download".to_string();
+    }
+
+    let stem = clean.split_once('.').map_or(&*clean, |(stem, _)| stem);
+    if RESERVED_NAMES.contains(&stem.to_ascii_uppercase().as_str()) {
+        clean = format!("_{clean}");
     }
     clean
 }
@@ -509,9 +527,12 @@ fn main() {
             let _ = app.set_menu(menu.clone());
             let _ = w.set_menu(menu);
 
-            let _ = handle
+            if let Err(error) = handle
                 .global_shortcut()
-                .register(Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyW));
+                .register(Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyW))
+            {
+                eprintln!("failed to register Ctrl+Alt+W global shortcut: {error}");
+            }
             let _ = tray::setup_tray(&handle);
 
             Ok(())
@@ -574,7 +595,7 @@ fn main() {
 mod url_validation_tests {
     use super::{
         is_internal_url, parse_whatsapp_link, release_download_reservation, reserve_unique_path,
-        resolve_custom_download_path,
+        resolve_custom_download_path, sanitize_filename,
     };
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -651,6 +672,20 @@ mod url_validation_tests {
         ] {
             assert!(parse_whatsapp_link(link).is_none(), "{link}");
         }
+    }
+
+    #[test]
+    fn sanitizes_windows_reserved_names_control_chars_and_trailing_dots() {
+        assert_eq!(sanitize_filename("CON.txt"), "_CON.txt");
+        assert_eq!(sanitize_filename("nul"), "_nul");
+        assert_eq!(sanitize_filename("com1.pdf"), "_com1.pdf");
+        assert_eq!(
+            sanitize_filename("not reserved lpt9.txt"),
+            "not reserved lpt9.txt"
+        );
+        assert_eq!(sanitize_filename("report\n.txt"), "report.txt");
+        assert_eq!(sanitize_filename("file name . . "), "file name");
+        assert_eq!(sanitize_filename("a/b\\c:d*e?f\"g<h>i|j"), "abcdefghij");
     }
 
     #[test]

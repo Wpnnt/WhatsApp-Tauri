@@ -1,0 +1,43 @@
+cargo :     Finished `release` profile [optimized + debuginfo] target(s) in 0.72s
+En l?nea: 8 Car?cter: 1
++ cargo bloat --release -n 30 > 'D:\dev\whatsapp-tauri\perf\bloat-funct ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished `r...get(s) in 0.72s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Analyzing target\release\whatsapp-tauri.exe
+
+ File  .text    Size             Crate Name
+ 8.5%  12.2%  1.0MiB    whatsapp_tauri whatsapp_tauri::main::inner::closure$0<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> >,tauri_utils::assets::EmbeddedAssets>
+ 0.7%   1.1% 90.4KiB             tauri tauri_runtime_wry::handle_user_message::<tauri::EventLoopMessage>
+ 0.7%   1.1% 90.1KiB             tauri tauri_runtime_wry::handle_user_message::<tauri::EventLoopMessage>
+ 0.5%   0.8% 65.7KiB tauri_runtime_wry tauri_runtime_wry::create_webview<enum2$<tauri::EventLoopMessage> >
+ 0.4%   0.6% 48.7KiB       tauri_utils tauri_utils::config::_::impl$0::deserialize::impl$2::visit_map<ref_mut$<serde_json::value::de::MapRefDeserializer> >
+ 0.3%   0.4% 33.7KiB        serde_json <&serde_json::value::Value as serde_core::de::Deserializer>::deserialize_struct::<<tauri_plugin_notification::models::NotificationData as serde_core::de::Deserialize>::deserialize::__Visitor>
+ 0.3%   0.4% 32.0KiB             tauri tauri::menu::plugin::init::<tauri_runtime_wry::Wry<tauri::EventLoopMessage>>::{closure#2}
+ 0.3%   0.4% 30.7KiB             tauri tauri::menu::plugin::init::<tauri_runtime_wry::Wry<tauri::EventLoopMessage>>
+ 0.2%   0.3% 26.9KiB             tauri tauri::menu::plugin::PredefinedMenuItemPayload::create_item<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > >
+ 0.2%   0.3% 25.6KiB             tauri tauri::manager::webview::WebviewManager<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > >::prepare_webview<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> >,tauri::app::AppHandle<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > > >
+ 0.2%   0.3% 25.6KiB             tauri tauri::manager::webview::WebviewManager<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > >::prepare_webview<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> >,tauri::window::Window<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > > >
+ 0.2%   0.3% 22.1KiB    whatsapp_tauri whatsapp_tauri::main
+ 0.2%   0.3% 21.6KiB               wry wry::webview2::InnerWebView::init_webview
+ 0.2%   0.3% 21.2KiB             tauri tauri::tray::plugin::init::<tauri_runtime_wry::Wry<tauri::EventLoopMessage>>::{closure#0}
+ 0.2%   0.2% 19.5KiB               std std::sys::process::windows::Command::spawn_with_attributes
+ 0.2%   0.2% 18.5KiB      regex_syntax <regex_syntax::hir::translate::TranslatorI as regex_syntax::ast::visitor::Visitor>::visit_post
+ 0.1%   0.2% 18.1KiB       tauri_utils <tauri_utils::assets::EmbeddedAssets>::get
+ 0.1%   0.2% 17.2KiB        serde_json <&serde_json::value::Value as serde_core::de::Deserializer>::deserialize_struct::<<tauri::menu::plugin::AboutMetadata as serde_core::de::Deserialize>::deserialize::__Visitor>
+ 0.1%   0.2% 16.9KiB             serde <serde::private::de::content::ContentRefDeserializer<serde_json::error::Error> as serde_core::de::Deserializer>::deserialize_struct::<<tauri::menu::plugin::AboutMetadata as serde_core::de::Deserialize>::deserialize::__Visitor>
+ 0.1%   0.2% 16.3KiB        urlpattern <urlpattern::UrlPatternInit>::process
+ 0.1%   0.2% 15.9KiB             tauri tauri::menu::plugin::SubmenuPayload::create_item<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > >
+ 0.1%   0.2% 15.1KiB             tauri <tauri::window::WindowBuilder<tauri_runtime_wry::Wry<tauri::EventLoopMessage>, tauri::app::AppHandle>>::build_internal
+ 0.1%   0.2% 14.9KiB             tauri tao::platform_impl::platform::event_loop::public_window_callback_inner::<tauri_runtime_wry::Message<tauri::EventLoopMessage>>::{closure#6}
+ 0.1%   0.2% 14.9KiB             tauri tao::platform_impl::platform::event_loop::public_window_callback_inner::<tauri_runtime_wry::Message<tauri::EventLoopMessage>>::{closure#6}
+ 0.1%   0.2% 14.8KiB             tauri <tauri::ipc::InvokeResolver>::respond_async_serialized_inner::<tauri_plugin_dialog::init<tauri_runtime_wry::Wry<tauri::EventLoopMessage>>::{closure#1}::{closure#2}::{closure#0}>::{closure#0}
+ 0.1%   0.2% 14.8KiB       tauri_utils <tauri_utils::acl::RemoteUrlPattern as core::str::traits::FromStr>::from_str
+ 0.1%   0.2% 14.7KiB             tauri tauri::window::plugin::init::<tauri_runtime_wry::Wry<tauri::EventLoopMessage>>::{closure#0}
+ 0.1%   0.2% 14.2KiB               std core::ops::function::FnOnce::call_once<whatsapp_tauri::main::closure_env$2,tuple$<ref_mut$<tauri::app::App<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > > > > >
+ 0.1%   0.2% 13.8KiB             tauri tauri::menu::builders::menu::SubmenuBuilder<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> >,tauri::webview::Webview<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > > >::build<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> >,tauri::webview::Webview<tauri_runtime_wry::Wry<enum2$<tauri::EventLoopMessage> > > >
+ 0.1%   0.2% 13.6KiB             tauri <tauri::menu::builders::menu::SubmenuBuilder<tauri_runtime_wry::Wry<tauri::EventLoopMessage>, tauri::app::AppHandle>>::build
+53.5%  77.2%  6.4MiB                   And 11237 smaller methods. Use -n N to show more.
+69.4% 100.0%  8.3MiB                   .text section size, the file size is 11.9MiB
+

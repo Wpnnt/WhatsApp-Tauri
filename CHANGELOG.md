@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-24
+
+### Added
+- **Dark Native Chrome on Windows**: The window now declares `theme: "Dark"`, so the native title bar, the menu bar, and dropdown menus render dark and match the WhatsApp dark UI instead of the system light theme. A window `backgroundColor` (`#111b21`) also removes the white flash at startup. Full source audit: see [AUDIT.md](AUDIT.md).
+
+### Fixed
+- **Windows Reserved Filenames**: Download filename sanitization now prefixes Windows reserved device names (`CON`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, …) — which resolve to hardware even with an extension — and strips control characters and trailing dots/spaces so the reserved name matches the file actually written.
+- **Tray Left Click**: The tray context menu no longer pops up on left click together with the window; the menu is right-click only, matching standard tray behavior.
+- **Global Shortcut Diagnostics**: A failure to register the `Ctrl + Alt + W` global shortcut (e.g., taken by another app) is now reported on stderr instead of being silently discarded.
+
 ## [0.3.2] - 2026-10-02
 
 ### Fixed

@@ -11,7 +11,10 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .text("quit", "Quit")
         .build()?;
 
-    let mut builder = TrayIconBuilder::new().menu(&menu).tooltip("WhatsApp Tauri");
+    let mut builder = TrayIconBuilder::new()
+        .menu(&menu)
+        .tooltip("WhatsApp Tauri")
+        .show_menu_on_left_click(false);
 
     if let Some(icon) = app.default_window_icon().cloned() {
         builder = builder.icon(icon);

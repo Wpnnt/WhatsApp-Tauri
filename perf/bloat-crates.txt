@@ -1,0 +1,40 @@
+cargo :     Finished `release` profile [optimized + debuginfo] target(s) in 0.68s
+En l?nea: 6 Car?cter: 1
++ cargo bloat --release --crates -n 25 > 'D:\dev\whatsapp-tauri\perf\bl ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished `r...get(s) in 0.68s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Analyzing target\release\whatsapp-tauri.exe
+
+ File  .text     Size Crate
+18.1%  26.1%   2.2MiB tauri
+11.7%  16.8%   1.4MiB std
+ 9.0%  12.9%   1.1MiB whatsapp_tauri
+ 6.5%   9.3% 790.7KiB tokio
+ 2.6%   3.7% 314.8KiB regex_automata
+ 2.1%   3.0% 255.6KiB regex_syntax
+ 2.1%   3.0% 251.6KiB serde_json
+ 2.0%   2.9% 241.7KiB tauri_utils
+ 1.4%   2.0% 172.3KiB urlpattern
+ 1.4%   2.0% 168.5KiB aho_corasick
+ 1.3%   1.9% 162.8KiB tauri_runtime_wry
+ 1.2%   1.7% 140.6KiB tao
+ 0.9%   1.2% 103.9KiB muda
+ 0.7%   1.0%  83.7KiB wry
+ 0.6%   0.9%  74.6KiB serde
+ 0.6%   0.8%  70.9KiB url
+ 0.5%   0.7%  60.9KiB crossbeam_channel
+ 0.5%   0.7%  57.2KiB webview2_com
+ 0.4%   0.5%  45.2KiB http
+ 0.3%   0.5%  42.6KiB rfd
+ 0.3%   0.4%  37.5KiB idna
+ 0.3%   0.4%  33.9KiB tauri_plugin_notification
+ 0.3%   0.4%  33.8KiB hashbrown
+ 0.3%   0.4%  33.6KiB infer
+ 0.3%   0.4%  32.2KiB softbuffer
+ 3.5%   5.0% 423.7KiB And 93 more crates. Use -n N to show more.
+69.4% 100.0%   8.3MiB .text section size, the file size is 11.9MiB
+
+Note: numbers above are a result of guesswork. They are not 100% correct and never will be.
+

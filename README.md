@@ -15,6 +15,9 @@ Supports Windows and Linux.
 [![Rust](https://img.shields.io/badge/Language-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows_%7C_Linux-blue.svg)](#)
 
+> [!NOTE]
+> **Fork (barraco002):** this fork ships `v0.3.3` with a dark native title bar and menus on Windows (matching the dark UI), plus hardening fixes from a full source audit — reserved Windows filenames in downloads, tray left-click behavior, and shortcut diagnostics. Details in [AUDIT.md](AUDIT.md) · [CHANGELOG](CHANGELOG.md) · [v0.3.3 release](../../releases/tag/v0.3.3).
+
 ---
 
 ## Features

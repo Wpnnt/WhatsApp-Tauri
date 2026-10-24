@@ -1,6 +1,6 @@
 [package]
 name = "whatsapp-tauri"
-version = "0.3.2"
+version = "0.3.3"
 description = "A Tauri App"
 authors = ["Wpnnt"]
 edition = "2021"
@@ -20,3 +20,13 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Perfil de release para distribución (iteración perf/release-profile).
+# Antes de este bloque el binario se compilaba con los defaults de Cargo:
+# opt-level=3, lto=false, codegen-units=16, panic=unwind, strip=none.
+[profile.release]
+opt-level = 3        # variante "z" medida y descartada: t_window +64%; ver perf-log.md
+lto = "fat"          # eliminación de código muerto entre crates (regex/tokio/tauri)
+codegen-units = 1    # más optimización global a costa de tiempo de build
+panic = "abort"      # sin tablas de desenrollado
+strip = "symbols"    # sin símbolos en el binario distribuido
