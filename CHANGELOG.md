@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Alt Menu Bar Toggle**: Press `Alt` to hide the native menu bar and press it again to show it, freeing vertical space while keeping the menu one keystroke away.
+
 ## [0.3.2] - 2026-10-02
 
 ### Fixed

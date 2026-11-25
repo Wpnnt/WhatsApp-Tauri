@@ -23,6 +23,49 @@ const MENU_DEEP_LINK_TOGGLE_ID: &str = "menu_deep_link_toggle";
 const MENU_DOWNLOAD_FOLDER_PICK_ID: &str = "menu_download_folder_pick";
 const MENU_DOWNLOAD_FOLDER_RESET_ID: &str = "menu_download_folder_reset";
 
+#[cfg(any(windows, target_os = "linux"))]
+const MENU_BAR_TOGGLE_SCRIPT: &str = r#"
+(function () {
+  try {
+    var altPressed = false;
+    var altUsed = false;
+    function resetAlt() {
+      altPressed = false;
+      altUsed = false;
+    }
+    window.addEventListener('keydown', function (event) {
+      if (event.key !== 'Alt') {
+        if (altPressed) altUsed = true;
+        return;
+      }
+      if (!altPressed || !event.repeat) {
+        altPressed = true;
+        altUsed = false;
+      }
+      if (event.ctrlKey || event.shiftKey || event.metaKey || event.getModifierState('AltGraph')) {
+        altUsed = true;
+        return;
+      }
+      event.preventDefault();
+    }, true);
+    window.addEventListener('keyup', function (event) {
+      if (event.key !== 'Alt' || !altPressed) return;
+      var used = altUsed;
+      resetAlt();
+      if (used) return;
+      event.preventDefault();
+      if (window.__TAURI_INTERNALS__) {
+        window.__TAURI_INTERNALS__.invoke('toggle_menu_bar').catch(function () {});
+      }
+    }, true);
+    window.addEventListener('blur', resetAlt);
+  } catch (error) {}
+})();
+"#;
+
+#[cfg(not(any(windows, target_os = "linux")))]
+const MENU_BAR_TOGGLE_SCRIPT: &str = "";
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 struct DownloadSettings {
     download_path: Option<String>,
@@ -322,6 +365,22 @@ fn build_native_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<tauri::men
     MenuBuilder::new(app).item(&settings).item(&help).build()
 }
 
+#[tauri::command]
+fn toggle_menu_bar(app: AppHandle) -> Result<bool, String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window not found".to_string())?;
+    let visible = window
+        .is_menu_visible()
+        .map_err(|error| error.to_string())?;
+    if visible {
+        window.hide_menu().map_err(|error| error.to_string())?;
+    } else {
+        window.show_menu().map_err(|error| error.to_string())?;
+    }
+    Ok(!visible)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -358,6 +417,7 @@ fn main() {
                 })
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![toggle_menu_bar])
         .setup(|app| {
 
             let handle = app.handle().clone();
@@ -374,6 +434,7 @@ fn main() {
             let w = WebviewWindowBuilder::from_config(app.handle(), &app.config().app.windows[0])?
                 .disable_drag_drop_handler()
                 .initialization_script(r#"(function(){try{const s=document.createElement('style');s.innerHTML='#app,.app-wrapper{height:100%!important;width:100%!important;position:absolute;top:0;left:0;}';document.head.appendChild(s);}catch(e){}try{if('Notification'in window&&Notification.permission!=='granted'){Notification.requestPermission().catch(function(){});}}catch(e){}})();"#)
+                .initialization_script(MENU_BAR_TOGGLE_SCRIPT)
                 // 1. Intercept normal frame-level navigation
                 .on_navigation(move |url: &tauri::Url| {
                     let url_str = url.as_str();
